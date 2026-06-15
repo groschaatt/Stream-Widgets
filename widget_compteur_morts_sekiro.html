@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: transparent;
+    font-family: 'Segoe UI', sans-serif;
+    padding: 18px;
+    width: 260px;
+  }
+
+  .widget {
+    background: rgba(26, 15, 46, 0.92);
+    border: 0.5px solid rgba(107, 63, 160, 0.4);
+    border-left: 3px solid #c4860a;
+    border-radius: 10px;
+    padding: 14px 18px;
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    position: relative;
+    overflow: hidden;
+    opacity: 0;
+    animation: fadeIn 0.6s ease forwards;
+  }
+
+  @keyframes fadeIn { to { opacity: 1; } }
+
+  .widget::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at left, rgba(196,134,10,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .skull-wrap {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    background: rgba(196,134,10,0.12);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    position: relative; z-index: 1;
+  }
+
+  .skull-wrap svg {
+    width: 26px; height: 26px;
+    animation: sway 3s ease-in-out infinite;
+  }
+
+  @keyframes sway {
+    0%, 100% { transform: rotate(-6deg); }
+    50%       { transform: rotate(6deg); }
+  }
+
+  .info {
+    flex: 1;
+    position: relative; z-index: 1;
+  }
+
+  .label {
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+    color: #c4860a;
+    opacity: 0.8;
+    margin-bottom: 1px;
+  }
+
+  .game {
+    font-size: 9px;
+    color: #9b7fc4;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+
+  .count {
+    font-size: 36px; font-weight: 900;
+    color: #e8d8ff;
+    line-height: 1;
+    transition: color 0.2s ease;
+  }
+
+  .count.bump {
+    animation: bump 0.35s ease;
+  }
+
+  @keyframes bump {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.4); color: #c4860a; }
+    100% { transform: scale(1); }
+  }
+
+  .hint {
+    font-size: 8px;
+    color: #6b3fa0;
+    margin-top: 4px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Boutons flottants pour le streamer */
+  .controls {
+    position: fixed;
+    bottom: 10px; right: 10px;
+    display: flex; gap: 6px;
+    z-index: 99;
+  }
+
+  .btn {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 16px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.1s ease, opacity 0.2s;
+  }
+
+  .btn:active { transform: scale(0.9); }
+  .btn.add    { background: rgba(196,134,10,0.25); color: #c4860a; }
+  .btn.reset  { background: rgba(107,63,160,0.25); color: #9b7fc4; }
+</style>
+</head>
+<body>
+<div class="widget">
+  <div class="skull-wrap">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2C7.03 2 3 6.03 3 11c0 2.98 1.47 5.6 3.73 7.24V21h2v-1h2.54v1h1.46v-1H15v1h2v-2.76C19.53 16.6 21 13.98 21 11c0-4.97-4.03-9-9-9zm-2.5 13c-.83 0-1.5-.67-1.5-1.5S8.67 12 9.5 12s1.5.67 1.5 1.5S10.33 15 9.5 15zm5 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" fill="#c4860a"/>
+    </svg>
+  </div>
+  <div class="info">
+    <div class="label">Morts</div>
+    <div class="game">Sekiro — Arc en cours</div>
+    <div class="count" id="count">0</div>
+    <div class="hint">!mort · !resetmort</div>
+  </div>
+</div>
+
+<!-- Boutons visibles uniquement pour le streamer -->
+<div class="controls">
+  <button class="btn add"   onclick="addDeath()"   title="Ajouter une mort">+</button>
+  <button class="btn reset" onclick="resetDeaths()" title="Reset">↺</button>
+</div>
+
+<script>
+  let deaths = parseInt(localStorage.getItem('sekiro_deaths') || '0');
+  const countEl = document.getElementById('count');
+
+  function render() {
+    countEl.textContent = deaths;
+    localStorage.setItem('sekiro_deaths', deaths);
+  }
+
+  function bump() {
+    countEl.classList.remove('bump');
+    void countEl.offsetWidth;
+    countEl.classList.add('bump');
+  }
+
+  function addDeath() {
+    deaths++;
+    bump();
+    render();
+  }
+
+  function resetDeaths() {
+    deaths = 0;
+    render();
+  }
+
+  // Commandes via URL params
+  // widget_compteur_morts_sekiro.html?cmd=mort  → +1
+  // widget_compteur_morts_sekiro.html?cmd=reset → 0
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('cmd') === 'mort')  { deaths++; bump(); }
+  if (params.get('cmd') === 'reset') { deaths = 0; }
+
+  // Touches clavier
+  document.addEventListener('keydown', e => {
+    if (e.key === '+' || e.key === '=') { addDeath(); }
+    if (e.key === 'r' || e.key === 'R') { resetDeaths(); }
+  });
+
+  render();
+</script>
+</body>
+</html>
