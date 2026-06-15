@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: transparent;
+    font-family: 'Segoe UI', sans-serif;
+    padding: 18px;
+    width: 320px;
+  }
+
+  .widget {
+    background: rgba(26, 15, 46, 0.92);
+    border: 0.5px solid rgba(107, 63, 160, 0.4);
+    border-left: 3px solid #00d4d4;
+    border-radius: 10px;
+    padding: 14px 16px;
+    backdrop-filter: blur(10px);
+    position: relative;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(-12px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+
+  .widget.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .widget.hiding {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+
+  .widget::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at top left, rgba(61,31,94,0.5) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .new-follow {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #00d4d4;
+    margin-bottom: 6px;
+    display: flex; align-items: center; gap: 6px;
+    position: relative; z-index: 1;
+  }
+
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #00d4d4;
+    animation: pulse 1s ease infinite;
+    box-shadow: 0 0 6px rgba(0,212,212,0.7);
+  }
+
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.5); opacity: 0.5; }
+  }
+
+  .follower-name {
+    font-size: 18px; font-weight: 900;
+    color: #e8d8ff;
+    margin-bottom: 10px;
+    position: relative; z-index: 1;
+  }
+
+  .follower-name span { color: #00d4d4; }
+
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    position: relative; z-index: 1;
+  }
+
+  .title {
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #9b7fc4;
+    opacity: 0.7;
+  }
+
+  .counts {
+    font-size: 12px; font-weight: 700;
+    color: #e8d8ff;
+  }
+
+  .counts span { color: #00d4d4; }
+
+  .bar-bg {
+    width: 100%; height: 6px;
+    background: rgba(107, 63, 160, 0.2);
+    border-radius: 99px;
+    overflow: visible;
+    margin-bottom: 6px;
+    position: relative; z-index: 1;
+  }
+
+  .bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #6b3fa0, #00d4d4);
+    border-radius: 99px;
+    width: 0%;
+    transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+  }
+
+  .bar-fill::after {
+    content: '';
+    position: absolute;
+    right: -5px; top: -4px;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #00d4d4;
+    box-shadow: 0 0 8px rgba(0,212,212,0.7);
+  }
+
+  .footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative; z-index: 1;
+  }
+
+  .message { font-size: 10px; color: #9b7fc4; }
+  .percent { font-size: 12px; font-weight: 700; color: #c4860a; }
+</style>
+</head>
+<body>
+<div class="widget" id="widget">
+  <div class="new-follow">
+    <div class="dot"></div>
+    Nouveau Follower !
+  </div>
+  <div class="follower-name" id="follower-name">—</div>
+  <div class="header">
+    <div class="title">Objectif Followers</div>
+    <div class="counts"><span id="current">—</span> / <span id="goal">500</span></div>
+  </div>
+  <div class="bar-bg">
+    <div class="bar-fill" id="bar"></div>
+  </div>
+  <div class="footer">
+    <div class="message">Merci pour ton follow ! 💜</div>
+    <div class="percent" id="percent">—</div>
+  </div>
+</div>
+
+<script>
+  const CLIENT_ID         = '0nlnc8mnn6qah1ok4h00yfx99sppkh';
+  const ACCESS_TOKEN      = 'hykqxri9n1z92ovpsoqkeijfgkqim3';
+  const BROADCASTER_LOGIN = 'groschaatt';
+  const GOAL              = 500;
+  const SHOW_DURATION     = 8000; // affiché 8 secondes après un follow
+
+  const widget = document.getElementById('widget');
+  let broadcasterId  = null;
+  let lastFollowName = null;
+  let hideTimer      = null;
+
+  async function getBroadcasterId() {
+    const res  = await fetch(`https://api.twitch.tv/helix/users?login=${BROADCASTER_LOGIN}`, {
+      headers: { 'Client-ID': CLIENT_ID, 'Authorization': `Bearer ${ACCESS_TOKEN}` }
+    });
+    const data = await res.json();
+    broadcasterId = data.data[0].id;
+  }
+
+  function showWidget(name, total) {
+    const pct = Math.min(Math.round((total / GOAL) * 100), 100);
+
+    document.getElementById('follower-name').textContent = name;
+    document.getElementById('current').textContent       = total;
+    document.getElementById('percent').textContent       = pct + '%';
+
+    widget.classList.remove('hiding');
+    widget.classList.add('visible');
+
+    setTimeout(() => {
+      document.getElementById('bar').style.width = pct + '%';
+    }, 200);
+
+    // Cache après SHOW_DURATION
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+      widget.classList.remove('visible');
+      widget.classList.add('hiding');
+      setTimeout(() => document.getElementById('bar').style.width = '0%', 600);
+    }, SHOW_DURATION);
+  }
+
+  async function checkFollowers() {
+    try {
+      if (!broadcasterId) await getBroadcasterId();
+
+      const res  = await fetch(`https://api.twitch.tv/helix/channels/followers?broadcaster_id=${broadcasterId}&first=1`, {
+        headers: { 'Client-ID': CLIENT_ID, 'Authorization': `Bearer ${ACCESS_TOKEN}` }
+      });
+      const data = await res.json();
+
+      if (!data.data || data.data.length === 0) return;
+
+      const latestName = data.data[0].user_name;
+      const total      = data.total || 0;
+
+      // Premier chargement — on enregistre sans afficher
+      if (lastFollowName === null) {
+        lastFollowName = latestName;
+        return;
+      }
+
+      // Nouveau follow détecté !
+      if (latestName !== lastFollowName) {
+        lastFollowName = latestName;
+        showWidget(latestName, total);
+      }
+
+    } catch(e) {
+      console.error(e);
+    }
+  }
+
+  checkFollowers();
+  setInterval(checkFollowers, 15000); // vérifie toutes les 15 secondes
+</script>
+</body>
+</html>
